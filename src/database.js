@@ -57,16 +57,28 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     used INTEGER DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS instructor_tokens (
+    token TEXT PRIMARY KEY,
+    course_id TEXT NOT NULL,
+    course_name TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL
+  );
 `)
 
-// Add canvas_user_id column for existing databases
+// Migrations for existing databases
 try { db.exec(`ALTER TABLE sessions ADD COLUMN canvas_user_id TEXT DEFAULT ''`) } catch (e) {}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
 
 function createSession(id, courseId, quizId, quizName, quizUrl, studentId, studentName, canvasUserId) {
   db.prepare(`
-    INSERT OR REPLACE INTO sessions (id, course_id, quiz_id, quiz_name, quiz_url, student_id, student_name, canvas_user_id)
+    INSERT OR REPLACE INTO sessions
+      (id, course_id, quiz_id, quiz_name, quiz_url, student_id, student_name, canvas_user_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, courseId, quizId || '', quizName || 'Exam', quizUrl || '', studentId, studentName, canvasUserId || studentId)
+  `).run(id, courseId, quizId || '', quizName || 'Exam', quizUrl || '',
+    studentId, studentName, canvasUserId || studentId)
   return db.prepare(`SELECT * FROM sessions WHERE id=?`).get(id)
 }
 
@@ -86,7 +98,6 @@ function updateReview(sessionId, status) {
   db.prepare(`UPDATE sessions SET review_status=? WHERE id=?`).run(status, sessionId)
 }
 
-// Check if student already has an active session for this course/quiz
 function getActiveSession(studentId, courseId) {
   return db.prepare(`
     SELECT * FROM sessions WHERE student_id=? AND course_id=? AND status='active'
@@ -97,14 +108,26 @@ function markIdVerified(sessionId) {
   db.prepare(`UPDATE sessions SET id_verified=1 WHERE id=?`).run(sessionId)
 }
 
+// Mark sessions older than N hours as abandoned (handles crashed browsers)
+function expireOldSessions(hoursOld = 6) {
+  const result = db.prepare(`
+    UPDATE sessions SET status='abandoned', ended_at=datetime('now')
+    WHERE status='active' AND started_at < datetime('now', '-' || ? || ' hours')
+  `).run(hoursOld)
+  return result.changes
+}
+
+// ── Captures ──────────────────────────────────────────────────────────────────
+
 function saveCapture(sessionId, courseId, studentId, filename, flagReason, isFlagged, captureType) {
   db.prepare(`
-    INSERT INTO captures (session_id, course_id, student_id, filename, flag_reason, is_flagged, capture_type)
+    INSERT INTO captures
+      (session_id, course_id, student_id, filename, flag_reason, is_flagged, capture_type)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(sessionId, courseId, studentId, filename, flagReason || '', isFlagged ? 1 : 0, captureType || 'scheduled')
-  if (isFlagged) {
-    db.prepare(`UPDATE sessions SET flag_count=flag_count+1 WHERE id=?`).run(sessionId)
-  }
+  // flag_count is only incremented by logEvent (severity='high') — NOT here.
+  // Every flagged capture is always accompanied by a prior high-severity event,
+  // so incrementing here would double-count flags.
 }
 
 function getCaptures(sessionId) {
@@ -118,6 +141,8 @@ function getFlaggedCaptures(courseId) {
     WHERE c.course_id=? AND c.is_flagged=1 ORDER BY c.captured_at DESC
   `).all(courseId)
 }
+
+// ── Events ────────────────────────────────────────────────────────────────────
 
 function logEvent(sessionId, courseId, studentId, type, detail, severity) {
   db.prepare(`
@@ -142,14 +167,18 @@ function getRecentEvents(courseId, limit) {
   `).all(courseId, limit || 20)
 }
 
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
 function getCourseStats(courseId) {
-  const total = db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE course_id=?`).get(courseId).n
+  const total   = db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE course_id=?`).get(courseId).n
   const flagged = db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE course_id=? AND flag_count>0`).get(courseId).n
   const pending = db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE course_id=? AND review_status='pending'`).get(courseId).n
-  const active = db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE course_id=? AND status='active'`).get(courseId).n
+  const active  = db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE course_id=? AND status='active'`).get(courseId).n
   const captures = db.prepare(`SELECT COUNT(*) as n FROM captures WHERE course_id=?`).get(courseId).n
   return { total, flagged, clean: total - flagged, pending, active, captures }
 }
+
+// ── Proctor tokens ────────────────────────────────────────────────────────────
 
 function createProctorToken(token, studentId, courseId, sessionId, quizUrl) {
   db.prepare(`
@@ -166,11 +195,32 @@ function markTokenUsed(token) {
   db.prepare(`UPDATE proctor_tokens SET used=1 WHERE token=?`).run(token)
 }
 
+// ── Instructor tokens ─────────────────────────────────────────────────────────
+
+function createInstructorToken(token, courseId, courseName) {
+  db.prepare(`
+    INSERT INTO instructor_tokens (token, course_id, course_name, expires_at)
+    VALUES (?, ?, ?, datetime('now', '+24 hours'))
+  `).run(token, courseId, courseName || '')
+}
+
+function getInstructorToken(token) {
+  return db.prepare(`
+    SELECT * FROM instructor_tokens
+    WHERE token=? AND expires_at > datetime('now')
+  `).get(token)
+}
+
+function cleanupExpiredInstructorTokens() {
+  db.prepare(`DELETE FROM instructor_tokens WHERE expires_at <= datetime('now')`).run()
+}
+
 module.exports = {
   createSession, getSession, endSession, getAllSessions, updateReview,
-  getActiveSession, markIdVerified,
+  getActiveSession, markIdVerified, expireOldSessions,
   saveCapture, getCaptures, getFlaggedCaptures,
   logEvent, getEvents, getRecentEvents,
   getCourseStats,
-  createProctorToken, getProctorToken, markTokenUsed
+  createProctorToken, getProctorToken, markTokenUsed,
+  createInstructorToken, getInstructorToken, cleanupExpiredInstructorTokens
 }

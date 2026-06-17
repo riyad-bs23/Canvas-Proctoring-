@@ -202,7 +202,7 @@ const HOST = '<%= HOST %>'
 const CAPTURE_MS = <%= captureInterval %> * 1000
 const FLAG_THRESHOLD = <%= flagThreshold %>
 
-let stream, captureTimer, countdownTimer, faceDetectionTimer, challengeTimer, audioContext, analyser
+let stream, captureTimer, countdownTimer, faceDetectionTimer, audioContext, analyser
 let flagCount = 0, capCount = 0, eventCount = 0
 let sessionEnding = false
 let nextCapIn = <%= captureInterval %>
@@ -215,8 +215,7 @@ let challengeActive = false
 let challengeCountdown = 0
 let challengeInterval = null
 let lastChallengeTime = Date.now()
-let CHALLENGE_INTERVAL_MS = 8 * 60 * 1000 // challenge every 8 min
-let loudCount = 0
+const CHALLENGE_INTERVAL_MS = 8 * 60 * 1000
 
 const NO_FACE_THRESHOLD = 3
 const MULTI_FACE_THRESHOLD = 2
@@ -293,9 +292,7 @@ async function runFaceDetection() {
 function showMultiFaceBlock() {
   const el = document.getElementById('multiface-block')
   el.style.display = 'flex'
-  let t = 0
-  const cd = document.getElementById('multiface-countdown')
-  cd.textContent = '🔒 LOCKED'
+  document.getElementById('multiface-countdown').textContent = '🔒 LOCKED'
 }
 
 // ── Identity challenge ────────────────────────────────────────────────────────
@@ -627,6 +624,9 @@ let quizWindow = null
 
 function openQuiz() {
   quizWindow = window.open(QUIZ_URL, '_blank')
+  if (!quizWindow) {
+    showAlert('⚠️ Popup was blocked. Allow popups for this site, then click Open Quiz again.', 8000)
+  }
 }
 
 // ── Auto-end session (same as End Session button, no confirm dialog) ──────────

@@ -34,7 +34,7 @@
   .ev:last-child{border-bottom:none;}
   .ev-type{font-weight:600;min-width:110px;}
   .ev-det{color:var(--muted);flex:1;}
-  .ev-time{color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;}
+  .ev-time{color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;white-space:nowrap;}
   .sh{color:var(--red);}
   .sl{color:var(--green);}
   .badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;}
@@ -52,7 +52,7 @@
     <h1>Session Review — <%= session.student_name %></h1>
     <div class="meta">
       <span>📋 <%= session.quiz_name %></span>
-      <span>🕐 <%= new Date(session.started_at).toLocaleString() %></span>
+      <span>🕐 <span class="local-time" data-utc="<%= session.started_at %>"><%= session.started_at %></span></span>
       <span>Status: <span class="badge b-<%= session.review_status %>"><%= session.review_status %></span></span>
       <span>Flags: <strong style="color:<%= session.flag_count>2?'var(--red)':session.flag_count>0?'var(--yellow)':'var(--green)' %>"><%= session.flag_count %></strong></span>
     </div>
@@ -60,19 +60,17 @@
   <div class="actions">
     <form method="POST" action="/session/<%= session.id %>/review" style="display:inline">
       <input type="hidden" name="status" value="cleared">
-      <input type="hidden" name="courseId" value="<%= session.course_id %>">
       <button type="submit" class="btn btn-clear">✓ Clear</button>
     </form>
     <form method="POST" action="/session/<%= session.id %>/review" style="display:inline">
       <input type="hidden" name="status" value="suspicious">
-      <input type="hidden" name="courseId" value="<%= session.course_id %>">
       <button type="submit" class="btn btn-flag">⚠ Suspicious</button>
     </form>
   </div>
 </div>
 
 <div class="summary">
-  <div class="s-item"><div class="n" style="color:var(--purple)"><%= captures.length %></div><div class="l">Captures</div></div>
+  <div class="s-item"><div class="n" style="color:var(--blue)"><%= captures.length %></div><div class="l">Captures</div></div>
   <div class="s-item"><div class="n" style="color:var(--red)"><%= captures.filter(c=>c.is_flagged).length %></div><div class="l">Flagged</div></div>
   <div class="s-item"><div class="n" style="color:var(--yellow)"><%= events.length %></div><div class="l">Events</div></div>
   <div class="s-item"><div class="n" style="color:var(--red)"><%= events.filter(e=>e.severity==='high').length %></div><div class="l">High Severity</div></div>
@@ -88,9 +86,11 @@
       <div class="cap-item <%= c.is_flagged?'flagged':'' %>">
         <img src="/captures/<%= c.filename %>" onerror="this.parentElement.style.display='none'">
         <div class="cm">
-          <%= new Date(c.captured_at).toLocaleTimeString() %>
+          <span class="local-time" data-utc="<%= c.captured_at %>" data-format="time"><%= c.captured_at %></span>
           <% if (c.is_flagged) { %><div class="cf">⚠ <%= c.flag_reason %></div><% } %>
-          <% if (c.capture_type && c.capture_type !== 'scheduled') { %><div style="font-size:10px;color:#a78bfa;margin-top:2px;text-transform:capitalize;"><%= c.capture_type.replace(/_/g,' ') %></div><% } %>
+          <% if (c.capture_type && c.capture_type !== 'scheduled') { %>
+            <div style="font-size:10px;color:#a78bfa;margin-top:2px;text-transform:capitalize;"><%= c.capture_type.replace(/_/g,' ') %></div>
+          <% } %>
         </div>
       </div>
       <% }) %>
@@ -107,7 +107,7 @@
       <li class="ev">
         <span class="ev-type <%= e.severity==='high'?'sh':'sl' %>"><%= e.severity==='high'?'🔴':'🟢' %> <%= e.event_type.replace(/_/g,' ') %></span>
         <span class="ev-det"><%= e.detail %></span>
-        <span class="ev-time"><%= new Date(e.occurred_at).toLocaleTimeString() %></span>
+        <span class="ev-time local-time" data-utc="<%= e.occurred_at %>" data-format="time"><%= e.occurred_at %></span>
       </li>
       <% }) %>
     </ul>
@@ -115,5 +115,16 @@
   </div>
 </div>
 
+<script>
+  document.querySelectorAll('.local-time').forEach(el => {
+    const raw = el.dataset.utc
+    if (!raw) return
+    const d = new Date(raw.includes('T') ? raw : raw.replace(' ', 'T') + 'Z')
+    if (isNaN(d)) return
+    el.textContent = el.dataset.format === 'time'
+      ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+      : d.toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+  })
+</script>
 </body>
 </html>
