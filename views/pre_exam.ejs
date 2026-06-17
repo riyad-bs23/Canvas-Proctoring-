@@ -264,6 +264,7 @@ let faceCheckOk = false
 let faceApiLoaded = false
 let camStream = null
 let faceCheckInterval = null
+let faceApiLoadAttempted = false
 
 // ── Quiz selection ────────────────────────────────────────────────────────────
 function selectQuiz(el) {
@@ -320,20 +321,51 @@ async function initWebcam() {
   }
 }
 
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = resolve
+    s.onerror = reject
+    document.head.appendChild(s)
+  })
+}
+
 async function loadFaceModels() {
+  setFaceBadge('loading', '⏳ Loading face detection...')
+
+  // Ensure face-api.js is loaded — try local first, then CDN fallback
+  if (typeof faceapi === 'undefined') {
+    try {
+      await loadScript('/js/face-api.min.js')
+    } catch (_) {
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js')
+      // weights are in the GitHub repo, not the npm package
+      } catch (_2) {
+        setFaceBadge('error', '⚠️ Face detection unavailable — proceeding manually')
+        faceCheckOk = true
+        document.getElementById('btn-webcam-next').disabled = false
+        return
+      }
+    }
+  }
+
+  // Load model weights — try local first, then CDN fallback
   try {
-    setFaceBadge('loading', '⏳ Loading face detection...')
-    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-    ])
+    const LOCAL_MODELS = '/face-models'
+    const CDN_MODELS = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights'
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(LOCAL_MODELS)
+    } catch (_) {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(CDN_MODELS)
+    }
     faceApiLoaded = true
     setFaceBadge('loading', '🔍 Scanning for faces...')
-    // Start repeated checks
     runFaceCheck()
     faceCheckInterval = setInterval(runFaceCheck, 2500)
   } catch (e) {
-    setFaceBadge('loading', '⚠️ Face detection unavailable — proceeding manually')
+    setFaceBadge('error', '⚠️ Face detection unavailable — proceeding manually')
     faceCheckOk = true
     document.getElementById('btn-webcam-next').disabled = false
   }
@@ -408,7 +440,5 @@ function setStep(n) {
   }
 }
 </script>
-<!-- face-api.js from CDN -->
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </body>
 </html>

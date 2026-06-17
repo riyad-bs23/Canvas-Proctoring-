@@ -32,6 +32,9 @@ app.use((req, res, next) => {
   next()
 })
 
+// ── Static files (face-api.js, model weights) ─────────────────────────────────
+app.use(express.static(path.join(__dirname, '..', 'public')))
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function parseCookies(req) {
   const cookies = {}
