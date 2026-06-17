@@ -150,26 +150,15 @@
 </div>
 
 <div class="main">
-  <!-- Monitor panel -->
-  <div class="monitor-panel">
-    <div>
-      <div class="panel-title" style="margin-bottom:10px;">Session Stats</div>
-      <div class="stat-row"><span>Captures</span><span class="stat-val" id="cap-count" style="color:var(--blue)">0</span></div>
-      <div class="stat-row" style="margin-top:6px;"><span>Flags</span><span class="stat-val" id="flag-count" style="color:var(--red)">0</span></div>
-      <div class="stat-row" style="margin-top:6px;"><span>Events</span><span class="stat-val" id="event-count" style="color:var(--yellow)">0</span></div>
-      <div class="stat-row" style="margin-top:6px;"><span>Face</span><span class="stat-val" id="face-status" style="color:var(--muted)">Loading</span></div>
-    </div>
-    <div>
-      <div class="panel-title" style="margin-bottom:8px;">Audio Level</div>
-      <div class="audio-bar-wrap">
-        <div class="audio-bar-bg"><div class="audio-bar-fill" id="audio-bar"></div></div>
-        <div style="font-size:10px;color:var(--muted);" id="audio-label">Monitoring...</div>
-      </div>
-    </div>
-    <div style="flex:1;display:flex;flex-direction:column;gap:8px;overflow:hidden;">
-      <div class="panel-title">Activity Log</div>
-      <div class="log-list" id="log-list"></div>
-    </div>
+  <!-- hidden stat/log elements kept for JS references -->
+  <div style="display:none">
+    <span id="cap-count"></span>
+    <span id="flag-count"></span>
+    <span id="event-count"></span>
+    <span id="face-status"></span>
+    <div id="audio-bar"></div>
+    <div id="audio-label"></div>
+    <div id="log-list"></div>
   </div>
 
   <!-- Content -->
