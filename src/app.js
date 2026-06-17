@@ -89,6 +89,7 @@ app.post('/launch', async (req, res) => {
     // Student — show pre-exam checklist with quiz picker
     return res.render('pre_exam', {
       studentId: lti.userId,
+      canvasUserId: lti.canvasUserId,
       studentName: lti.name,
       courseId: lti.courseId,
       quizzes: quizzes || [],
@@ -115,7 +116,7 @@ app.get('/api/quizzes/:courseId', async (req, res) => {
 // ── Student: Start proctoring session ────────────────────────────────────────
 app.post('/start-session', (req, res) => {
   try {
-    const { studentId, studentName, courseId, quizId, quizName, quizUrl } = req.body
+    const { studentId, studentName, courseId, quizId, quizName, quizUrl, canvasUserId } = req.body
 
     // Prevent duplicate active sessions
     const existing = db.getActiveSession(studentId, courseId)
@@ -136,7 +137,7 @@ app.post('/start-session', (req, res) => {
     }
 
     const sessionId = uuidv4()
-    db.createSession(sessionId, courseId, quizId, quizName, quizUrl, studentId, studentName)
+    db.createSession(sessionId, courseId, quizId, quizName, quizUrl, studentId, studentName, canvasUserId)
 
     return res.render('student', {
       sessionId,
@@ -264,6 +265,41 @@ app.post('/session/:sessionId/review', (req, res) => {
     courseId, courseName: courseName || 'Course',
     HOST, flash: { type: 'success', message: `Session marked as ${status}` }
   })
+})
+
+// ── API: Check if quiz was submitted (for auto-ending session) ────────────────
+app.get('/api/check-submission/:sessionId', async (req, res) => {
+  try {
+    const session = db.getSession(req.params.sessionId)
+    if (!session || session.status !== 'active') return res.json({ submitted: false })
+    if (!CANVAS_TOKEN || !session.quiz_id || session.quiz_id === 'manual') {
+      return res.json({ submitted: false })
+    }
+
+    const canvasUserId = session.canvas_user_id || session.student_id
+    const url = `${CANVAS_URL}/api/v1/courses/${session.course_id}/quizzes/${session.quiz_id}/submissions?per_page=100`
+    const httpModule = CANVAS_URL.startsWith('https') ? require('https') : require('http')
+
+    const data = await new Promise((resolve) => {
+      const r = httpModule.get(url, { headers: { Authorization: `Bearer ${CANVAS_TOKEN}` } }, (response) => {
+        let body = ''
+        response.on('data', chunk => body += chunk)
+        response.on('end', () => { try { resolve(JSON.parse(body)) } catch { resolve({}) } })
+      })
+      r.on('error', () => resolve({}))
+      r.setTimeout(5000, () => { r.destroy(); resolve({}) })
+    })
+
+    const subs = Array.isArray(data) ? data : (data.quiz_submissions || [])
+    const ids = [String(canvasUserId), String(session.student_id)].filter(Boolean)
+    const match = subs.find(s =>
+      ids.includes(String(s.user_id)) &&
+      (s.workflow_state === 'complete' || s.workflow_state === 'pending_review')
+    )
+    res.json({ submitted: !!match })
+  } catch (err) {
+    res.json({ submitted: false })
+  }
 })
 
 // ── Health check ──────────────────────────────────────────────────────────────

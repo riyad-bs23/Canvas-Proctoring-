@@ -176,9 +176,9 @@
       </p>
 
       <% if (quizUrl) { %>
-        <a href="<%= quizUrl %>" target="_blank" class="quiz-btn" id="quiz-link">
+        <button class="quiz-btn" id="quiz-link" onclick="openQuiz()">
           Open Quiz →
-        </a>
+        </button>
         <div class="session-info">Opens in a new tab. Keep this tab open.<br>Session: <%= sessionId.slice(0,8) %>...</div>
       <% } else { %>
         <div style="font-size:13px;color:var(--yellow);background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:12px;">
@@ -197,6 +197,7 @@ const SESSION_ID = '<%= sessionId %>'
 const COURSE_ID = '<%= courseId %>'
 const STUDENT_ID = '<%= studentId %>'
 const QUIZ_URL = '<%= quizUrl %>'
+const QUIZ_ID = '<%= quizId %>'
 const HOST = '<%= HOST %>'
 const CAPTURE_MS = <%= captureInterval %> * 1000
 const FLAG_THRESHOLD = <%= flagThreshold %>
@@ -620,6 +621,59 @@ function updateFaceStatus(text, color) {
     el.style.color = color === 'green' ? 'var(--green)' : color === 'red' ? 'var(--red)' : 'var(--muted)'
   }
 }
+
+// ── Quiz window tracking ──────────────────────────────────────────────────────
+let quizWindow = null
+
+function openQuiz() {
+  quizWindow = window.open(QUIZ_URL, '_blank')
+}
+
+// ── Auto-end session (same as End Session button, no confirm dialog) ──────────
+async function autoEndSession() {
+  if (sessionEnding) return
+  sessionEnding = true
+  clearInterval(captureTimer); clearInterval(countdownTimer); clearInterval(faceDetectionTimer)
+  if (audioContext) audioContext.close()
+  logEvent('quiz_submitted', 'Quiz submitted — session ended automatically', 'low')
+  await takeCapture('Final capture — quiz submitted', false, 'final')
+  try {
+    await fetch(`${HOST}/api/end-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, courseId: COURSE_ID, studentId: STUDENT_ID, quizUrl: QUIZ_URL })
+    })
+    if (stream) stream.getTracks().forEach(t => t.stop())
+    if (document.fullscreenElement) document.exitFullscreen()
+    document.body.innerHTML = `
+      <div style="font-family:system-ui;background:#080c18;color:#e8eaf6;min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:20px;">
+        <div style="font-size:56px;">✅</div>
+        <h2 style="font-size:22px;">Quiz Submitted — Session Complete</h2>
+        <p style="color:#6b7fa3;font-size:14px;max-width:420px;line-height:1.7;">
+          Your quiz was submitted and proctoring ended automatically.<br>
+          Session ID: <strong style="color:#4a9eff">${SESSION_ID.slice(0,8)}...</strong><br>
+          Flags recorded: <strong style="color:${flagCount > 0 ? '#f87171' : '#34d399'}">${flagCount}</strong>
+        </p>
+      </div>
+    `
+  } catch (e) {}
+}
+
+// ── Primary: detect quiz tab closed (fires within 3s of student closing tab) ──
+setInterval(() => {
+  if (!started || sessionEnding || !quizWindow) return
+  if (quizWindow.closed) autoEndSession()
+}, 3000)
+
+// ── Backup: Canvas API poll every 25s (catches submit without closing tab) ────
+setInterval(async () => {
+  if (!started || sessionEnding || !QUIZ_ID || QUIZ_ID === 'manual') return
+  try {
+    const r = await fetch(`${HOST}/api/check-submission/${SESSION_ID}`)
+    const data = await r.json()
+    if (data.submitted) autoEndSession()
+  } catch (e) {}
+}, 25000)
 
 initWebcam()
 </script>

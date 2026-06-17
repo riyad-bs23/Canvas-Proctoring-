@@ -16,6 +16,7 @@ db.exec(`
     quiz_url TEXT DEFAULT '',
     student_id TEXT NOT NULL,
     student_name TEXT NOT NULL,
+    canvas_user_id TEXT DEFAULT '',
     status TEXT DEFAULT 'active',
     flag_count INTEGER DEFAULT 0,
     review_status TEXT DEFAULT 'pending',
@@ -58,11 +59,14 @@ db.exec(`
   );
 `)
 
-function createSession(id, courseId, quizId, quizName, quizUrl, studentId, studentName) {
+// Add canvas_user_id column for existing databases
+try { db.exec(`ALTER TABLE sessions ADD COLUMN canvas_user_id TEXT DEFAULT ''`) } catch (e) {}
+
+function createSession(id, courseId, quizId, quizName, quizUrl, studentId, studentName, canvasUserId) {
   db.prepare(`
-    INSERT OR REPLACE INTO sessions (id, course_id, quiz_id, quiz_name, quiz_url, student_id, student_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, courseId, quizId || '', quizName || 'Exam', quizUrl || '', studentId, studentName)
+    INSERT OR REPLACE INTO sessions (id, course_id, quiz_id, quiz_name, quiz_url, student_id, student_name, canvas_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, courseId, quizId || '', quizName || 'Exam', quizUrl || '', studentId, studentName, canvasUserId || studentId)
   return db.prepare(`SELECT * FROM sessions WHERE id=?`).get(id)
 }
 
