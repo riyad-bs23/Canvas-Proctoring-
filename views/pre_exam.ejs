@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-Exam Check — Proctored Exam</title>
+<style>
+  :root{--bg:#080c18;--card:#111e35;--border:#1a2840;--text:#dde4f0;--muted:#6b7fa3;--blue:#4a9eff;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--purple:#a78bfa;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:560px;width:100%;}
+  h1{font-size:20px;font-weight:600;margin-bottom:4px;}
+  .subtitle{font-size:13px;color:var(--muted);margin-bottom:24px;}
+
+  /* Steps */
+  .steps{display:flex;gap:6px;margin-bottom:26px;}
+  .step{flex:1;height:3px;border-radius:2px;background:var(--border);transition:background 0.3s;}
+  .step.done{background:var(--green);}
+  .step.active{background:var(--blue);}
+
+  /* Section panels */
+  .section{display:none;}
+  .section.visible{display:block;}
+
+  /* Quiz picker */
+  .quiz-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;max-height:280px;overflow-y:auto;}
+  .quiz-item{background:var(--bg);border:2px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color 0.2s,background 0.2s;display:flex;align-items:center;gap:12px;}
+  .quiz-item:hover{border-color:var(--blue);background:rgba(74,158,255,0.04);}
+  .quiz-item.selected{border-color:var(--blue);background:rgba(74,158,255,0.08);}
+  .quiz-item .qi-icon{font-size:18px;flex-shrink:0;}
+  .quiz-item .qi-info .qi-name{font-size:13px;font-weight:500;}
+  .quiz-item .qi-info .qi-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+  .no-quizzes{text-align:center;padding:24px;color:var(--muted);font-size:13px;}
+  .loading-quizzes{text-align:center;padding:24px;color:var(--muted);font-size:13px;}
+
+  /* Webcam */
+  .webcam-test{background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;position:relative;}
+  #test-video{width:100%;max-height:190px;object-fit:cover;display:block;background:#000;}
+  .webcam-overlay{position:absolute;top:8px;right:8px;display:flex;gap:6px;}
+  .webcam-status{padding:10px 14px;font-size:12px;display:flex;align-items:center;gap:8px;}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);}
+  .status-dot.ok{background:var(--green);animation:pulse 1.5s infinite;}
+  .status-dot.err{background:var(--red);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+  /* Face check */
+  .face-check-box{background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.2);border-radius:10px;padding:14px;margin-bottom:16px;}
+  .face-check-title{font-size:13px;font-weight:600;color:var(--purple);margin-bottom:6px;}
+  .face-check-desc{font-size:12px;color:var(--muted);line-height:1.5;}
+  .face-status-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;margin-top:8px;}
+  .face-badge-ok{background:rgba(52,211,153,0.12);color:var(--green);border:1px solid rgba(52,211,153,0.3);}
+  .face-badge-warn{background:rgba(248,113,113,0.12);color:var(--red);border:1px solid rgba(248,113,113,0.3);}
+  .face-badge-loading{background:rgba(107,127,163,0.12);color:var(--muted);border:1px solid rgba(107,127,163,0.3);}
+
+  /* Rules */
+  .rule-box{background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.2);border-radius:10px;padding:14px;margin-bottom:20px;}
+  .rule-box p{font-size:12px;color:var(--red);line-height:1.7;}
+  .rule-box strong{display:block;margin-bottom:6px;font-size:13px;}
+
+  /* Checklist */
+  .checklist{list-style:none;margin-bottom:20px;}
+  .check-item{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .check-item:last-child{border-bottom:none;}
+  .check-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px;}
+  .ci-warn{background:rgba(251,191,36,0.12);}
+  .ci-info{background:rgba(74,158,255,0.12);}
+  .ci-danger{background:rgba(248,113,113,0.12);}
+  .ci-purple{background:rgba(167,139,250,0.12);}
+  .check-content .title{font-size:13px;font-weight:500;margin-bottom:2px;}
+  .check-content .desc{font-size:11px;color:var(--muted);line-height:1.5;}
+
+  /* Buttons */
+  .btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:system-ui;transition:opacity 0.2s;}
+  .btn-primary{background:var(--blue);color:white;}
+  .btn-primary:hover:not(:disabled){opacity:0.88;}
+  .btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-green{background:var(--green);color:#080c18;}
+  .btn-green:hover:not(:disabled){opacity:0.88;}
+  .btn-green:disabled{opacity:0.4;cursor:not-allowed;}
+
+  /* Selected quiz banner */
+  .selected-quiz-banner{background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;display:none;}
+  .selected-quiz-banner.show{display:flex;align-items:center;gap:8px;}
+  .selected-quiz-banner .sq-name{font-weight:600;color:var(--green);}
+
+  .section-title{font-size:15px;font-weight:600;margin-bottom:4px;}
+  .section-sub{font-size:12px;color:var(--muted);margin-bottom:18px;}
+
+  .alert-box{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--red);margin-bottom:14px;display:none;}
+  .alert-box.show{display:block;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🔒 Pre-Exam Check</h1>
+  <div class="subtitle">Complete each step before starting — <strong><%= studentName %></strong></div>
+
+  <!-- Step progress bar -->
+  <div class="steps">
+    <div class="step active" id="s1"></div>
+    <div class="step" id="s2"></div>
+    <div class="step" id="s3"></div>
+  </div>
+
+  <!-- ── STEP 1: Select Quiz ───────────────────────────────────────────── -->
+  <div class="section visible" id="step-quiz">
+    <div class="section-title">Step 1: Select Your Quiz</div>
+    <div class="section-sub">Choose the exam you are about to take from the list below.</div>
+
+    <div class="alert-box" id="quiz-alert">Please select a quiz to continue.</div>
+
+    <% if (quizzes && quizzes.length > 0) { %>
+      <div class="quiz-list" id="quiz-list">
+        <% quizzes.forEach(function(q) { %>
+          <div class="quiz-item" onclick="selectQuiz(this)"
+            data-id="<%= q.id %>"
+            data-name="<%= (q.title || 'Untitled Quiz').replace(/"/g, '&quot;') %>"
+            data-url="<%= (q.html_url || '').replace(/"/g, '&quot;') %>"
+            data-points="<%= q.points_possible || '' %>"
+            data-time="<%= q.time_limit || '' %>">
+            <div class="qi-icon">📋</div>
+            <div class="qi-info">
+              <div class="qi-name"><%= q.title || 'Untitled Quiz' %></div>
+              <div class="qi-meta">
+                <% if (q.points_possible) { %><%= q.points_possible %> pts<% } %>
+                <% if (q.time_limit) { %> · <%= q.time_limit %> min<% } %>
+                <% if (q.question_count) { %> · <%= q.question_count %> questions<% } %>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="no-quizzes">
+        <div style="font-size:32px;margin-bottom:8px;">📭</div>
+        <div style="margin-bottom:4px;">No published quizzes found</div>
+        <div style="font-size:11px;">Ask your instructor to publish the quiz, or check your Canvas API token.</div>
+        <!-- Fallback manual entry -->
+        <div style="margin-top:16px;text-align:left;">
+          <div style="font-size:12px;color:var(--text);margin-bottom:6px;font-weight:500;">Enter quiz URL manually:</div>
+          <input id="manual-quiz-url" type="url" placeholder="https://canvas.example.com/courses/.../quizzes/..."
+            style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;outline:none;"
+            oninput="handleManualUrl(this.value)">
+          <input id="manual-quiz-name" type="text" placeholder="Quiz name"
+            style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:12px;outline:none;margin-top:6px;">
+        </div>
+      </div>
+    <% } %>
+
+    <button class="btn btn-primary" id="btn-quiz-next" onclick="goToStep2()" disabled>
+      Continue to Webcam Check →
+    </button>
+  </div>
+
+  <!-- ── STEP 2: Webcam + Face Check ──────────────────────────────────── -->
+  <div class="section" id="step-webcam">
+    <div class="section-title">Step 2: Webcam & Face Verification</div>
+    <div class="section-sub">Your webcam must be active and only one face must be visible.</div>
+
+    <div class="webcam-test">
+      <video id="test-video" autoplay playsinline muted></video>
+      <div class="webcam-status">
+        <div class="status-dot" id="cam-dot"></div>
+        <span id="cam-text">Requesting webcam access...</span>
+      </div>
+    </div>
+
+    <!-- Single-person enforcement -->
+    <div class="face-check-box">
+      <div class="face-check-title">👤 Single-Person Verification</div>
+      <div class="face-check-desc">
+        Only <strong>one person</strong> is allowed to be visible during the exam. The system checks your webcam automatically.
+        If multiple people are detected, you will not be able to proceed.
+      </div>
+      <div class="face-status-badge face-badge-loading" id="face-badge">⏳ Waiting for webcam...</div>
+    </div>
+
+    <div class="alert-box" id="webcam-alert"></div>
+
+    <button class="btn btn-primary" id="btn-webcam-next" onclick="goToStep3()" disabled>
+      Continue to Exam Rules →
+    </button>
+  </div>
+
+  <!-- ── STEP 3: Rules + Confirm ──────────────────────────────────────── -->
+  <div class="section" id="step-rules">
+    <div class="section-title">Step 3: Review Rules & Begin</div>
+    <div class="section-sub">Read the rules carefully. Your session will be monitored.</div>
+
+    <div class="selected-quiz-banner show" id="selected-banner">
+      <span>📋</span>
+      <span>Selected: <span class="sq-name" id="banner-name">—</span></span>
+    </div>
+
+    <div class="rule-box">
+      <strong>⚠️ Exam Rules — Violations are recorded</strong>
+      Do not switch tabs or windows during the exam.<br>
+      Stay in fullscreen mode at all times.<br>
+      Keep your face visible and centered in the webcam.<br>
+      <strong>Only one person</strong> may be present — others detected = immediate flag.<br>
+      Do not minimize the browser or use keyboard shortcuts (Alt+Tab, F12).<br>
+      Do not copy text or right-click.<br>
+      Audio monitoring is active — loud conversations are flagged.<br>
+      All violations are timestamped and reviewed by your instructor.
+    </div>
+
+    <ul class="checklist">
+      <li class="check-item">
+        <div class="check-icon ci-info">📸</div>
+        <div class="check-content">
+          <div class="title">Webcam Monitoring</div>
+          <div class="desc">Captures every <%= captureInterval %>s. Face detection runs continuously.</div>
+        </div>
+      </li>
+      <li class="check-item">
+        <div class="check-icon ci-purple">👤</div>
+        <div class="check-content">
+          <div class="title">Single-Person Policy</div>
+          <div class="desc">Multiple faces trigger an immediate flag and capture. Others must leave the room.</div>
+        </div>
+      </li>
+      <li class="check-item">
+        <div class="check-icon ci-warn">⛶</div>
+        <div class="check-content">
+          <div class="title">Fullscreen Enforced</div>
+          <div class="desc">Exiting fullscreen is logged as a high-severity violation.</div>
+        </div>
+      </li>
+      <li class="check-item">
+        <div class="check-icon ci-danger">🔊</div>
+        <div class="check-content">
+          <div class="title">Audio Monitoring</div>
+          <div class="desc">Microphone monitors for unusual audio. Persistent loud sounds are flagged.</div>
+        </div>
+      </li>
+      <li class="check-item">
+        <div class="check-icon ci-danger">🚫</div>
+        <div class="check-content">
+          <div class="title">Tab Switching & Focus Loss</div>
+          <div class="desc">Every tab switch or window blur is captured and logged with timestamp.</div>
+        </div>
+      </li>
+    </ul>
+
+    <form method="POST" action="/start-session" id="start-form">
+      <input type="hidden" name="studentId" value="<%= studentId %>">
+      <input type="hidden" name="studentName" value="<%= studentName %>">
+      <input type="hidden" name="courseId" value="<%= courseId %>">
+      <input type="hidden" name="quizId" id="field-quiz-id" value="">
+      <input type="hidden" name="quizName" id="field-quiz-name" value="">
+      <input type="hidden" name="quizUrl" id="field-quiz-url" value="">
+      <button type="submit" class="btn btn-green" id="start-btn">
+        ✅ I Agree — Start Proctored Exam →
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+let selectedQuiz = null
+let webcamReady = false
+let faceCheckOk = false
+let faceApiLoaded = false
+let camStream = null
+let faceCheckInterval = null
+
+// ── Quiz selection ────────────────────────────────────────────────────────────
+function selectQuiz(el) {
+  document.querySelectorAll('.quiz-item').forEach(i => i.classList.remove('selected'))
+  el.classList.add('selected')
+  selectedQuiz = {
+    id: el.dataset.id,
+    name: el.dataset.name,
+    url: el.dataset.url
+  }
+  document.getElementById('btn-quiz-next').disabled = false
+  document.getElementById('quiz-alert').classList.remove('show')
+}
+
+function handleManualUrl(val) {
+  if (val.includes('quizzes')) {
+    const nameEl = document.getElementById('manual-quiz-name')
+    selectedQuiz = { id: 'manual', name: nameEl.value || 'Quiz', url: val }
+    document.getElementById('btn-quiz-next').disabled = false
+  }
+}
+
+function goToStep2() {
+  if (!selectedQuiz) {
+    document.getElementById('quiz-alert').classList.add('show')
+    return
+  }
+  // Check if manual entry was used
+  const manualUrl = document.getElementById('manual-quiz-url')
+  const manualName = document.getElementById('manual-quiz-name')
+  if (manualUrl && manualUrl.value) {
+    selectedQuiz = { id: 'manual', name: manualName.value || 'Quiz', url: manualUrl.value }
+  }
+
+  setStep(2)
+  document.getElementById('step-quiz').classList.remove('visible')
+  document.getElementById('step-webcam').classList.add('visible')
+  initWebcam()
+}
+
+// ── Webcam + face detection ───────────────────────────────────────────────────
+async function initWebcam() {
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    document.getElementById('test-video').srcObject = camStream
+    document.getElementById('cam-dot').className = 'status-dot ok'
+    document.getElementById('cam-text').textContent = '✓ Webcam active — checking faces...'
+    webcamReady = true
+    await loadFaceModels()
+  } catch (err) {
+    document.getElementById('cam-dot').className = 'status-dot err'
+    document.getElementById('cam-text').textContent = '❌ Webcam access denied — required to proceed'
+    setFaceBadge('error', '❌ Webcam required')
+  }
+}
+
+async function loadFaceModels() {
+  try {
+    setFaceBadge('loading', '⏳ Loading face detection...')
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+    ])
+    faceApiLoaded = true
+    setFaceBadge('loading', '🔍 Scanning for faces...')
+    // Start repeated checks
+    runFaceCheck()
+    faceCheckInterval = setInterval(runFaceCheck, 2500)
+  } catch (e) {
+    setFaceBadge('loading', '⚠️ Face detection unavailable — proceeding manually')
+    faceCheckOk = true
+    document.getElementById('btn-webcam-next').disabled = false
+  }
+}
+
+async function runFaceCheck() {
+  if (!faceApiLoaded) return
+  const video = document.getElementById('test-video')
+  if (!video.srcObject || video.readyState < 2) return
+
+  try {
+    const detections = await faceapi.detectAllFaces(
+      video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.45 })
+    )
+    const n = detections.length
+    const alertEl = document.getElementById('webcam-alert')
+
+    if (n === 1) {
+      setFaceBadge('ok', '✓ One person detected — ready to proceed')
+      faceCheckOk = true
+      document.getElementById('btn-webcam-next').disabled = false
+      alertEl.classList.remove('show')
+    } else if (n === 0) {
+      setFaceBadge('error', '⚠️ No face detected — sit in front of webcam')
+      faceCheckOk = false
+      document.getElementById('btn-webcam-next').disabled = true
+      alertEl.textContent = 'No face detected. Please ensure you are clearly visible to the webcam.'
+      alertEl.classList.add('show')
+    } else {
+      setFaceBadge('error', `🚫 ${n} people detected — only 1 allowed`)
+      faceCheckOk = false
+      document.getElementById('btn-webcam-next').disabled = true
+      alertEl.textContent = `${n} people detected in frame. Only the student may be present. Please ask others to leave before proceeding.`
+      alertEl.classList.add('show')
+    }
+  } catch (e) {}
+}
+
+function setFaceBadge(type, text) {
+  const el = document.getElementById('face-badge')
+  el.textContent = text
+  el.className = 'face-status-badge ' + (
+    type === 'ok' ? 'face-badge-ok' :
+    type === 'error' ? 'face-badge-warn' :
+    'face-badge-loading'
+  )
+}
+
+function goToStep3() {
+  if (!webcamReady) return
+  if (!faceCheckOk) {
+    document.getElementById('webcam-alert').textContent = 'Face verification must pass before you can continue.'
+    document.getElementById('webcam-alert').classList.add('show')
+    return
+  }
+  clearInterval(faceCheckInterval)
+  setStep(3)
+  document.getElementById('step-webcam').classList.remove('visible')
+  document.getElementById('step-rules').classList.add('visible')
+
+  // Populate form fields
+  document.getElementById('field-quiz-id').value = selectedQuiz.id
+  document.getElementById('field-quiz-name').value = selectedQuiz.name
+  document.getElementById('field-quiz-url').value = selectedQuiz.url
+  document.getElementById('banner-name').textContent = selectedQuiz.name
+}
+
+function setStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById('s' + i)
+    el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '')
+  }
+}
+</script>
+<!-- face-api.js from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+</body>
+</html>

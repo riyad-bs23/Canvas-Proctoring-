@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proctoring Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#080c18;--surface:#0e1628;--card:#111e35;--border:#1a2840;--text:#dde4f0;--muted:#6b7fa3;--blue:#4a9eff;--green:#34d399;--yellow:#fbbf24;--red:#f87171;--purple:#a78bfa;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px 24px;}
+  .flash{padding:10px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;font-weight:500;background:rgba(52,211,153,0.1);border:1px solid var(--green);color:var(--green);}
+  .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+  .header h1{font-size:20px;font-weight:600;}
+  .header h1 span{color:var(--red);}
+  .tag{font-size:11px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.3);border-radius:20px;padding:4px 12px;color:var(--red);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;}
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:24px;}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+  .stat .n{font-family:'DM Mono',monospace;font-size:24px;font-weight:500;}
+  .stat .l{font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-top:3px;}
+  .sl{font-size:11px;text-transform:uppercase;letter-spacing:0.09em;color:var(--muted);font-weight:600;margin-bottom:12px;margin-top:20px;display:flex;align-items:center;gap:8px;}
+  .sl::after{content:'';flex:1;height:1px;background:var(--border);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);font-weight:600;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);}
+  td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(74,158,255,0.03);}
+  .badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;}
+  .b-pending{background:rgba(251,191,36,0.12);color:var(--yellow);border:1px solid rgba(251,191,36,0.25);}
+  .b-cleared{background:rgba(52,211,153,0.1);color:var(--green);border:1px solid rgba(52,211,153,0.2);}
+  .b-suspicious{background:rgba(248,113,113,0.12);color:var(--red);border:1px solid rgba(248,113,113,0.25);}
+  .b-active{background:rgba(74,158,255,0.12);color:var(--blue);border:1px solid rgba(74,158,255,0.25);}
+  .fc{font-family:'DM Mono',monospace;font-size:12px;font-weight:600;}
+  .fc-0{color:var(--green);}
+  .fc-low{color:var(--yellow);}
+  .fc-high{color:var(--red);}
+  .btn-view{background:var(--blue);color:white;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;text-decoration:none;}
+  .ev-list{list-style:none;}
+  .ev{display:flex;gap:12px;padding:8px 0;border-bottom:1px dashed var(--border);font-size:12px;align-items:flex-start;}
+  .ev:last-child{border-bottom:none;}
+  .ev-type{font-weight:600;min-width:120px;}
+  .ev-det{color:var(--muted);flex:1;}
+  .ev-time{color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;white-space:nowrap;}
+  .sh{color:var(--red);}
+  .sl2{color:var(--green);}
+  .cap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;}
+  .cap{background:var(--card);border:1px solid var(--red);border-radius:8px;overflow:hidden;}
+  .cap img{width:100%;height:80px;object-fit:cover;display:block;}
+  .cap .ci{padding:5px 7px;font-size:10px;}
+  .cap .cn{color:var(--red);font-weight:600;}
+  .cap .ct{color:var(--muted);}
+  .empty{color:var(--muted);font-size:14px;padding:24px 0;text-align:center;}
+</style>
+</head>
+<body>
+<% if (flash) { %><div class="flash"><%= flash.message %></div><% } %>
+
+<div class="header">
+  <h1>🔒 Proctoring <span>Dashboard</span></h1>
+  <span class="tag">Instructor View</span>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n" style="color:var(--blue)"><%= stats.total %></div><div class="l">Sessions</div></div>
+  <div class="stat"><div class="n" style="color:var(--red)"><%= stats.flagged %></div><div class="l">Flagged</div></div>
+  <div class="stat"><div class="n" style="color:var(--green)"><%= stats.clean %></div><div class="l">Clean</div></div>
+  <div class="stat"><div class="n" style="color:var(--yellow)"><%= stats.pending %></div><div class="l">Pending Review</div></div>
+  <div class="stat"><div class="n" style="color:var(--blue)"><%= stats.active || 0 %></div><div class="l">Live Now</div></div>
+  <div class="stat"><div class="n" style="color:var(--purple)"><%= stats.captures %></div><div class="l">Captures</div></div>
+</div>
+
+<div class="sl">All Sessions</div>
+<% if (sessions.length === 0) { %>
+  <p class="empty">No sessions yet. Students will appear here after they start a proctored session.</p>
+<% } else { %>
+<table>
+  <thead><tr><th>Student</th><th>Exam</th><th>Started</th><th>Status</th><th>Flags</th><th>Review</th><th></th></tr></thead>
+  <tbody>
+    <% sessions.forEach(s => { %>
+    <tr>
+      <td><strong><%= s.student_name %></strong></td>
+      <td style="color:var(--muted)"><%= s.quiz_name %></td>
+      <td style="color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;" class="local-time" data-utc="<%= s.started_at %>"><%= s.started_at %></td>
+      <td><span class="badge b-<%= s.status==='active'?'active':s.flag_count>0?'suspicious':'cleared' %>"><%= s.status==='active'?'● Live':s.flag_count>0?'⚠ Flagged':'✓ Clean' %></span></td>
+      <td><span class="fc <%= s.flag_count===0?'fc-0':s.flag_count<3?'fc-low':'fc-high' %>"><%= s.flag_count %></span></td>
+      <td><span class="badge b-<%= s.review_status %>"><%= s.review_status %></span></td>
+      <td><a href="/session/<%= s.id %>" class="btn-view">Review →</a></td>
+    </tr>
+    <% }) %>
+  </tbody>
+</table>
+<% } %>
+
+<% if (flagged.length > 0) { %>
+<div class="sl">Flagged Captures (<%= flagged.length %>)</div>
+<div class="cap-grid">
+  <% flagged.slice(0,12).forEach(c => { %>
+  <div class="cap">
+    <img src="/captures/<%= c.filename %>" alt="capture" onerror="this.parentElement.style.display='none'">
+    <div class="ci">
+      <div class="cn"><%= c.student_name %></div>
+      <div class="ct"><%= new Date(c.captured_at).toLocaleTimeString() %></div>
+      <% if (c.flag_reason) { %><div style="color:var(--yellow);font-size:9px;"><%= c.flag_reason %></div><% } %>
+    </div>
+  </div>
+  <% }) %>
+</div>
+<% } %>
+
+<% if (recentEvents.length > 0) { %>
+<div class="sl">Recent Events</div>
+<ul class="ev-list">
+  <% recentEvents.forEach(e => { %>
+  <li class="ev">
+    <span class="ev-type <%= e.severity==='high'?'sh':'sl2' %>"><%= e.severity==='high'?'🔴':'🟢' %> <%= e.event_type.replace(/_/g,' ') %></span>
+    <span class="ev-det"><%= e.student_name %> — <%= e.detail %></span>
+    <span class="ev-time local-time" data-utc="<%= e.occurred_at %>"><%= e.occurred_at %></span>
+  </li>
+  <% }) %>
+</ul>
+<% } %>
+<script>
+  document.querySelectorAll('.local-time').forEach(el => {
+    const raw = el.dataset.utc
+    if (!raw) return
+    // SQLite datetime('now') returns "YYYY-MM-DD HH:MM:SS" in UTC — append Z to mark it
+    const d = new Date(raw.includes('T') ? raw : raw.replace(' ', 'T') + 'Z')
+    if (isNaN(d)) return
+    el.textContent = d.toLocaleString(undefined, {
+      year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+    })
+  })
+</script>
+</body>
+</html>

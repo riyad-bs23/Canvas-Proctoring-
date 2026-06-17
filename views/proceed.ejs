@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Proctoring Complete</title>
+<style>
+  body{font-family:system-ui,sans-serif;background:#080c18;color:#e8eaf6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .card{background:#111e35;border:1px solid #1a2840;border-radius:16px;padding:36px;max-width:440px;width:100%;text-align:center;}
+  h2{font-size:20px;margin-bottom:10px;}
+  p{font-size:13px;color:#6b7fa3;line-height:1.7;margin-bottom:24px;}
+  .quiz-btn{display:inline-block;background:#34d399;color:#080c18;border-radius:8px;padding:14px 32px;font-size:15px;font-weight:700;text-decoration:none;cursor:pointer;}
+  .quiz-btn:hover{opacity:0.88;}
+  .session-note{font-size:11px;color:#3d4f6e;margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div style="font-size:48px;margin-bottom:16px;">✅</div>
+  <h2>Proctoring Verified</h2>
+  <p>Your identity has been verified and your proctoring session is active. Click below to open your quiz. Complete your quiz and return here when done.</p>
+  <% if (quizUrl) { %>
+    <a href="<%= quizUrl %>" class="quiz-btn">Open Quiz →</a>
+  <% } else { %>
+    <p style="color:#fbbf24;">No quiz URL was configured. Contact your instructor.</p>
+  <% } %>
+  <div class="session-note">Session: <%= sessionId.slice(0,8) %>...</div>
+</div>
+</body>
+</html>

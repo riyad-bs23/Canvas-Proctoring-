@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Proctoring Active — <%= quizName %></title>
+<style>
+  :root{--bg:#080c18;--card:#111e35;--border:#1a2840;--text:#dde4f0;--muted:#6b7fa3;--red:#f87171;--green:#34d399;--yellow:#fbbf24;--blue:#4a9eff;--purple:#a78bfa;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);}
+  body{display:flex;flex-direction:column;}
+
+  /* Fullscreen warning */
+  #fs-warn{display:none;position:fixed;inset:0;background:rgba(8,12,24,0.97);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:20px;}
+  #fs-warn h2{color:var(--red);font-size:22px;}
+  #fs-warn p{color:var(--muted);font-size:14px;max-width:380px;line-height:1.6;}
+  #fs-btn{background:var(--blue);color:white;border:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:600;cursor:pointer;}
+
+  /* Multi-face block overlay */
+  #multiface-block{display:none;position:fixed;inset:0;background:rgba(8,12,24,0.98);z-index:9998;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:20px;}
+  #multiface-block h2{color:var(--red);font-size:22px;}
+  #multiface-block p{color:var(--muted);font-size:14px;max-width:400px;line-height:1.6;}
+  #multiface-countdown{font-size:48px;font-weight:700;color:var(--red);font-family:monospace;}
+
+  /* Identity re-challenge */
+  #id-challenge{display:none;position:fixed;inset:0;background:rgba(8,12,24,0.97);z-index:9997;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:20px;}
+  #id-challenge h2{color:var(--yellow);font-size:20px;}
+  #id-challenge p{color:var(--muted);font-size:13px;max-width:380px;line-height:1.6;}
+  #id-challenge-timer{font-size:42px;font-weight:700;color:var(--yellow);font-family:monospace;}
+  .challenge-cam-wrap{border:3px solid var(--yellow);border-radius:12px;overflow:hidden;width:240px;height:160px;}
+  #challenge-video{width:100%;height:100%;object-fit:cover;display:block;}
+  #challenge-confirm-btn{background:var(--yellow);color:#080c18;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;}
+
+  /* Alert */
+  #alert{display:none;position:fixed;top:0;left:0;right:0;background:rgba(248,113,113,0.95);color:white;padding:10px 20px;text-align:center;font-size:13px;font-weight:600;z-index:998;animation:slideDown 0.3s ease;}
+  @keyframes slideDown{from{transform:translateY(-100%);}to{transform:translateY(0);}}
+
+  /* Top bar */
+  .topbar{background:var(--card);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}
+  .tl{display:flex;align-items:center;gap:12px;}
+  .exam-name{font-size:13px;font-weight:600;}
+  .student{font-size:11px;color:var(--muted);}
+  .tr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+
+  /* Webcam */
+  .cam-wrap{position:relative;width:120px;height:80px;border-radius:6px;overflow:hidden;border:2px solid var(--border);background:#000;flex-shrink:0;}
+  .cam-wrap.cam-danger{border-color:var(--red);box-shadow:0 0 8px rgba(248,113,113,0.4);}
+  .cam-wrap.cam-ok{border-color:var(--green);}
+  #live-video{width:100%;height:100%;object-fit:cover;}
+  .cam-live{position:absolute;bottom:3px;right:4px;background:rgba(0,0,0,0.7);border-radius:3px;padding:1px 5px;font-size:9px;color:white;}
+
+  .pill{font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;border:1px solid;}
+  .pill-rec{background:rgba(248,113,113,0.12);color:var(--red);border-color:rgba(248,113,113,0.3);}
+  .pill-ok{background:rgba(52,211,153,0.1);color:var(--green);border-color:rgba(52,211,153,0.2);}
+  .pill-warn{background:rgba(251,191,36,0.12);color:var(--yellow);border-color:rgba(251,191,36,0.25);}
+  .pill-high{background:rgba(248,113,113,0.12);color:var(--red);border-color:rgba(248,113,113,0.25);}
+  .pill-purple{background:rgba(167,139,250,0.1);color:var(--purple);border-color:rgba(167,139,250,0.2);}
+
+  .timer{font-size:10px;color:var(--muted);font-family:monospace;}
+
+  /* Main content */
+  .main{flex:1;display:flex;overflow:hidden;}
+
+  /* Monitoring panel */
+  .monitor-panel{width:220px;background:var(--card);border-right:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex-shrink:0;}
+  .panel-title{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:600;}
+  .stat-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;}
+  .stat-val{font-family:monospace;font-weight:700;}
+  .log-list{flex:1;overflow-y:auto;}
+  .log-item{font-size:10px;padding:5px 0;border-bottom:1px dashed var(--border);display:flex;flex-direction:column;gap:1px;}
+  .log-item:last-child{border-bottom:none;}
+  .log-msg{font-weight:500;}
+  .log-time{color:var(--muted);}
+  .log-ok{color:var(--green);}
+  .log-warn{color:var(--yellow);}
+  .log-high{color:var(--red);}
+
+  /* Content area */
+  .content{flex:1;display:flex;align-items:center;justify-content:center;padding:30px;text-align:center;}
+  .ready-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:32px;max-width:440px;}
+  .ready-box h2{font-size:18px;margin-bottom:10px;}
+  .ready-box p{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:20px;}
+  .quiz-btn{display:inline-block;background:var(--green);color:#080c18;border:none;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;}
+  .quiz-btn:hover{opacity:0.88;}
+  .session-info{font-size:11px;color:var(--muted);margin-top:14px;}
+  .resume-badge{background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);border-radius:6px;padding:6px 12px;font-size:11px;color:var(--purple);margin-bottom:12px;display:inline-block;}
+
+  #end-btn{background:rgba(248,113,113,0.12);color:var(--red);border:1px solid rgba(248,113,113,0.3);border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;}
+  canvas{display:none;}
+
+  /* Audio level bar */
+  .audio-bar-wrap{display:flex;flex-direction:column;gap:4px;}
+  .audio-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .audio-bar-fill{height:100%;width:0%;background:var(--green);border-radius:2px;transition:width 0.15s;}
+  .audio-bar-fill.loud{background:var(--red);}
+</style>
+</head>
+<body>
+
+<!-- Multi-face block overlay -->
+<div id="multiface-block">
+  <div style="font-size:48px;">🚫</div>
+  <h2>Multiple People Detected</h2>
+  <p>Only the registered student may be present during the exam. The session has been flagged.<br><br>
+     Please ask all other people to leave. The exam will resume automatically when only one person is detected.</p>
+  <div id="multiface-countdown">--</div>
+  <div style="font-size:12px;color:var(--muted);">Exam locked until single person is confirmed</div>
+</div>
+
+<!-- Identity re-challenge -->
+<div id="id-challenge">
+  <div style="font-size:40px;">🔍</div>
+  <h2>Identity Verification</h2>
+  <p>Please look directly at the camera to confirm your identity. Respond within the time limit or the session will be flagged.</p>
+  <div class="challenge-cam-wrap">
+    <video id="challenge-video" autoplay playsinline muted></video>
+  </div>
+  <div id="id-challenge-timer">30</div>
+  <button id="challenge-confirm-btn" onclick="confirmChallenge()">✓ Confirm — I'm still here</button>
+</div>
+
+<!-- Fullscreen warning -->
+<div id="fs-warn">
+  <div style="font-size:48px;">⚠️</div>
+  <h2>Return to Fullscreen</h2>
+  <p>This exam requires fullscreen mode. Exiting fullscreen has been recorded as a violation.</p>
+  <button id="fs-btn" onclick="enterFS()">Return to Fullscreen</button>
+</div>
+
+<div id="alert"></div>
+
+<div class="topbar">
+  <div class="tl">
+    <div class="cam-wrap" id="cam-wrap">
+      <video id="live-video" autoplay playsinline muted></video>
+      <div class="cam-live">● LIVE</div>
+    </div>
+    <div>
+      <div class="exam-name">🔒 <%= quizName %></div>
+      <div class="student"><%= studentName %></div>
+    </div>
+  </div>
+  <div class="tr">
+    <span class="pill pill-rec">● REC</span>
+    <span class="pill pill-ok" id="flag-pill">0 Flags</span>
+    <span class="pill pill-warn" id="face-pill">👤 Loading...</span>
+    <span class="pill pill-purple" id="audio-pill">🔊 Audio OK</span>
+    <span class="timer" id="cap-timer">Next: --s</span>
+    <button id="end-btn" onclick="endSession()">End Session</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Monitor panel -->
+  <div class="monitor-panel">
+    <div>
+      <div class="panel-title" style="margin-bottom:10px;">Session Stats</div>
+      <div class="stat-row"><span>Captures</span><span class="stat-val" id="cap-count" style="color:var(--blue)">0</span></div>
+      <div class="stat-row" style="margin-top:6px;"><span>Flags</span><span class="stat-val" id="flag-count" style="color:var(--red)">0</span></div>
+      <div class="stat-row" style="margin-top:6px;"><span>Events</span><span class="stat-val" id="event-count" style="color:var(--yellow)">0</span></div>
+      <div class="stat-row" style="margin-top:6px;"><span>Face</span><span class="stat-val" id="face-status" style="color:var(--muted)">Loading</span></div>
+    </div>
+    <div>
+      <div class="panel-title" style="margin-bottom:8px;">Audio Level</div>
+      <div class="audio-bar-wrap">
+        <div class="audio-bar-bg"><div class="audio-bar-fill" id="audio-bar"></div></div>
+        <div style="font-size:10px;color:var(--muted);" id="audio-label">Monitoring...</div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:8px;overflow:hidden;">
+      <div class="panel-title">Activity Log</div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+    <div class="ready-box">
+      <% if (typeof resumed !== 'undefined' && resumed) { %>
+        <div class="resume-badge">🔄 Session Resumed</div>
+      <% } %>
+      <div style="font-size:40px;margin-bottom:12px;">✅</div>
+      <h2>Proctoring Active</h2>
+      <p>
+        Your session is being monitored. Webcam captures every <strong><%= captureInterval %> seconds</strong>.
+        Face detection and audio monitoring are running continuously.<br><br>
+        Click below to open your quiz. <strong>Do not close this tab</strong> — proctoring must stay active.
+      </p>
+
+      <% if (quizUrl) { %>
+        <a href="<%= quizUrl %>" target="_blank" class="quiz-btn" id="quiz-link">
+          Open Quiz →
+        </a>
+        <div class="session-info">Opens in a new tab. Keep this tab open.<br>Session: <%= sessionId.slice(0,8) %>...</div>
+      <% } else { %>
+        <div style="font-size:13px;color:var(--yellow);background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:12px;">
+          ⚠️ Quiz URL not available. Contact your instructor.
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<canvas id="cap-canvas" width="640" height="480"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+const SESSION_ID = '<%= sessionId %>'
+const COURSE_ID = '<%= courseId %>'
+const STUDENT_ID = '<%= studentId %>'
+const QUIZ_URL = '<%= quizUrl %>'
+const HOST = '<%= HOST %>'
+const CAPTURE_MS = <%= captureInterval %> * 1000
+const FLAG_THRESHOLD = <%= flagThreshold %>
+
+let stream, captureTimer, countdownTimer, faceDetectionTimer, challengeTimer, audioContext, analyser
+let flagCount = 0, capCount = 0, eventCount = 0
+let sessionEnding = false
+let nextCapIn = <%= captureInterval %>
+let started = false
+let faceApiLoaded = false
+let noFaceCount = 0
+let multiFaceCount = 0
+let multiFaceActive = false
+let challengeActive = false
+let challengeCountdown = 0
+let challengeInterval = null
+let lastChallengeTime = Date.now()
+let CHALLENGE_INTERVAL_MS = 8 * 60 * 1000 // challenge every 8 min
+let loudCount = 0
+
+const NO_FACE_THRESHOLD = 3
+const MULTI_FACE_THRESHOLD = 2
+
+// ── Face detection ────────────────────────────────────────────────────────────
+async function loadFaceModels() {
+  try {
+    updateFaceStatus('Loading...', 'muted')
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+    faceApiLoaded = true
+    updateFaceStatus('Ready', 'green')
+    addLog('Face detection ready', 'ok')
+  } catch (e) {
+    updateFaceStatus('Unavailable', 'muted')
+    addLog('Face detection unavailable', 'warn')
+  }
+}
+
+async function runFaceDetection() {
+  if (!faceApiLoaded || !stream) return
+  const video = document.getElementById('live-video')
+  if (!video.srcObject || video.readyState < 2) return
+
+  try {
+    const detections = await faceapi.detectAllFaces(
+      video, new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.4 })
+    )
+    const n = detections.length
+    const camWrap = document.getElementById('cam-wrap')
+
+    if (n === 0) {
+      noFaceCount++; multiFaceCount = 0
+      updateFaceStatus('No Face', 'red')
+      setPill('face-pill', '👤 No Face', 'pill-high')
+      camWrap.className = 'cam-wrap cam-danger'
+      if (noFaceCount >= NO_FACE_THRESHOLD) {
+        noFaceCount = 0
+        logEvent('no_face_detected', `No face for ${NO_FACE_THRESHOLD} checks`, 'high')
+        addLog('⚠️ No face detected', 'high')
+        takeCapture('No face detected', true, 'face_alert')
+        flagCount++; updateStats()
+        showAlert('⚠️ No face detected! Keep your face visible.', 5000)
+      }
+    } else if (n > 1) {
+      multiFaceCount++; noFaceCount = 0
+      updateFaceStatus(`${n} Faces!`, 'red')
+      setPill('face-pill', `👥 ${n} Faces!`, 'pill-high')
+      camWrap.className = 'cam-wrap cam-danger'
+      if (multiFaceCount >= MULTI_FACE_THRESHOLD && !multiFaceActive) {
+        multiFaceCount = 0
+        multiFaceActive = true
+        logEvent('multiple_faces', `${n} faces detected`, 'high')
+        addLog(`🚫 ${n} faces detected — blocked`, 'high')
+        takeCapture(`Multiple faces (${n})`, true, 'face_alert')
+        flagCount++; updateStats()
+        showMultiFaceBlock()
+      }
+    } else {
+      noFaceCount = 0; multiFaceCount = 0
+      updateFaceStatus('✓ Detected', 'green')
+      setPill('face-pill', '👤 Face OK', 'pill-ok')
+      camWrap.className = 'cam-wrap cam-ok'
+      if (multiFaceActive) {
+        multiFaceActive = false
+        document.getElementById('multiface-block').style.display = 'none'
+        addLog('✓ Single person confirmed', 'ok')
+        logEvent('multi_face_resolved', 'Single person confirmed', 'low')
+      }
+    }
+  } catch (e) {}
+}
+
+function showMultiFaceBlock() {
+  const el = document.getElementById('multiface-block')
+  el.style.display = 'flex'
+  let t = 0
+  const cd = document.getElementById('multiface-countdown')
+  cd.textContent = '🔒 LOCKED'
+}
+
+// ── Identity challenge ────────────────────────────────────────────────────────
+function scheduleChallenge() {
+  setInterval(() => {
+    if (challengeActive || multiFaceActive) return
+    const now = Date.now()
+    if (now - lastChallengeTime >= CHALLENGE_INTERVAL_MS) {
+      triggerChallenge()
+    }
+  }, 30000)
+}
+
+function triggerChallenge() {
+  if (challengeActive) return
+  challengeActive = true
+  lastChallengeTime = Date.now()
+  challengeCountdown = 30
+
+  const el = document.getElementById('id-challenge')
+  const vid = document.getElementById('challenge-video')
+  if (stream) vid.srcObject = stream
+  el.style.display = 'flex'
+
+  logEvent('identity_challenge', 'Identity re-verification triggered', 'low')
+  addLog('🔍 Identity check', 'warn')
+  updateChallengeTimer()
+
+  challengeInterval = setInterval(() => {
+    challengeCountdown--
+    updateChallengeTimer()
+    if (challengeCountdown <= 0) {
+      clearInterval(challengeInterval)
+      // No response — flag
+      logEvent('challenge_timeout', 'Student did not respond to identity check', 'high')
+      addLog('⚠️ Identity challenge timeout', 'high')
+      takeCapture('Identity challenge timeout', true, 'identity_check')
+      flagCount++; updateStats()
+      challengeActive = false
+      el.style.display = 'none'
+      showAlert('⚠️ Identity verification timeout recorded!', 6000)
+    }
+  }, 1000)
+}
+
+function updateChallengeTimer() {
+  const el = document.getElementById('id-challenge-timer')
+  el.textContent = challengeCountdown
+  el.style.color = challengeCountdown <= 10 ? 'var(--red)' : 'var(--yellow)'
+}
+
+function confirmChallenge() {
+  if (!challengeActive) return
+  clearInterval(challengeInterval)
+  challengeActive = false
+  document.getElementById('id-challenge').style.display = 'none'
+  takeCapture('Identity confirmed', false, 'identity_check')
+  logEvent('challenge_passed', 'Student confirmed identity', 'low')
+  addLog('✓ Identity confirmed', 'ok')
+}
+
+// ── Audio monitoring ──────────────────────────────────────────────────────────
+async function initAudio() {
+  try {
+    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    analyser = audioContext.createAnalyser()
+    analyser.fftSize = 256
+    const src = audioContext.createMediaStreamSource(audioStream)
+    src.connect(analyser)
+    monitorAudio()
+    addLog('Audio monitoring active', 'ok')
+    setPill('audio-pill', '🔊 Audio OK', 'pill-ok')
+  } catch (e) {
+    setPill('audio-pill', '🔇 No Mic', 'pill-warn')
+    addLog('Microphone unavailable', 'warn')
+  }
+}
+
+function monitorAudio() {
+  const dataArr = new Uint8Array(analyser.frequencyBinCount)
+  let loudSeconds = 0
+
+  setInterval(() => {
+    if (!analyser) return
+    analyser.getByteFrequencyData(dataArr)
+    const avg = dataArr.reduce((a,b) => a+b, 0) / dataArr.length
+    const pct = Math.min(100, (avg / 128) * 100)
+    const bar = document.getElementById('audio-bar')
+    const label = document.getElementById('audio-label')
+
+    bar.style.width = pct + '%'
+
+    if (pct > 65) {
+      bar.className = 'audio-bar-fill loud'
+      setPill('audio-pill', '🔊 Loud!', 'pill-warn')
+      label.textContent = `Level: ${Math.round(pct)}% — Loud`
+      loudSeconds++
+      if (loudSeconds >= 5) {
+        loudSeconds = 0
+        logEvent('loud_audio', `Sustained loud audio detected (${Math.round(pct)}%)`, 'high')
+        addLog('⚠️ Loud audio flagged', 'high')
+        flagCount++; updateStats()
+        showAlert('⚠️ Loud audio detected and flagged!', 4000)
+      }
+    } else {
+      bar.className = 'audio-bar-fill'
+      setPill('audio-pill', '🔊 Audio OK', 'pill-ok')
+      label.textContent = `Level: ${Math.round(pct)}%`
+      loudSeconds = 0
+    }
+  }, 1000)
+}
+
+// ── Webcam ───────────────────────────────────────────────────────────────────
+async function initWebcam() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true })
+    document.getElementById('live-video').srcObject = stream
+    addLog('Webcam started', 'ok')
+    await loadFaceModels()
+    await initAudio()
+    startSession()
+  } catch (e) {
+    addLog('Webcam failed', 'high')
+  }
+}
+
+// ── Session start ─────────────────────────────────────────────────────────────
+function startSession() {
+  started = true
+  enterFS()
+  startCaptures()
+  setupEvents()
+  scheduleChallenge()
+  logEvent('session_start', 'Proctoring session started', 'low')
+  setTimeout(() => takeCapture('Identity photo', false, 'identity'), 1500)
+  faceDetectionTimer = setInterval(runFaceDetection, 5000)
+  setTimeout(runFaceDetection, 3000)
+}
+
+// ── Fullscreen ────────────────────────────────────────────────────────────────
+function enterFS() {
+  document.documentElement.requestFullscreen().catch(() => {})
+}
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && started) {
+    document.getElementById('fs-warn').style.display = 'flex'
+    logEvent('fullscreen_exit', 'Exited fullscreen', 'high')
+    addLog('⚠️ Fullscreen exited', 'high')
+    flagCount++; updateStats()
+    showAlert('⚠️ Fullscreen violation recorded!', 4000)
+  } else {
+    document.getElementById('fs-warn').style.display = 'none'
+  }
+})
+
+// ── Captures ──────────────────────────────────────────────────────────────────
+function startCaptures() {
+  countdownTimer = setInterval(() => {
+    nextCapIn--
+    document.getElementById('cap-timer').textContent = `Next: ${nextCapIn}s`
+    if (nextCapIn <= 0) nextCapIn = CAPTURE_MS / 1000
+  }, 1000)
+  captureTimer = setInterval(() => takeCapture('Scheduled capture', false, 'scheduled'), CAPTURE_MS)
+}
+
+async function takeCapture(reason, isFlagged, captureType) {
+  const video = document.getElementById('live-video')
+  if (!video.srcObject) return
+  const canvas = document.getElementById('cap-canvas')
+  canvas.getContext('2d').drawImage(video, 0, 0, 640, 480)
+  const imageData = canvas.toDataURL('image/png')
+  try {
+    const res = await fetch(`${HOST}/api/capture`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, courseId: COURSE_ID, studentId: STUDENT_ID, imageData, flagReason: reason, isFlagged, captureType: captureType || 'scheduled' })
+    })
+    const data = await res.json()
+    capCount++
+    if (isFlagged) flagCount = data.flagCount || flagCount
+    updateStats()
+    addLog(isFlagged ? `⚠️ ${reason}` : '📸 Capture', isFlagged ? 'warn' : 'ok')
+    nextCapIn = CAPTURE_MS / 1000
+    if (data.exceeded) showAlert(`⚠️ ${flagCount} violations — session flagged for review`, 8000)
+  } catch (e) {}
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+async function logEvent(type, detail, severity) {
+  eventCount++; updateStats()
+  try {
+    await fetch(`${HOST}/api/event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, courseId: COURSE_ID, studentId: STUDENT_ID, eventType: type, detail, severity })
+    })
+  } catch (e) {}
+}
+
+function setupEvents() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      logEvent('tab_switch', 'Tab switched or minimized', 'high')
+      addLog('⚠️ Tab switch detected', 'high')
+      takeCapture('Tab switch', true, 'violation')
+      flagCount++; updateStats()
+      showAlert('⚠️ Tab switching detected and recorded!', 5000)
+    }
+  })
+
+  window.addEventListener('blur', () => {
+    if (started) {
+      logEvent('window_blur', 'Window lost focus', 'high')
+      addLog('⚠️ Window lost focus', 'high')
+      flagCount++; updateStats()
+    }
+  })
+
+  document.addEventListener('contextmenu', e => {
+    e.preventDefault()
+    logEvent('right_click', 'Right-click attempted', 'low')
+    addLog('Right-click blocked', 'warn')
+  })
+
+  document.addEventListener('copy', e => {
+    e.preventDefault()
+    logEvent('copy_attempt', 'Copy attempted', 'low')
+    addLog('Copy blocked', 'warn')
+  })
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'F12') { e.preventDefault(); logEvent('devtools', 'F12 pressed', 'high'); addLog('⚠️ DevTools attempt', 'high') }
+    if (e.altKey && e.key === 'Tab') { e.preventDefault(); logEvent('alt_tab', 'Alt+Tab', 'high'); addLog('⚠️ Alt+Tab', 'high') }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'c') e.preventDefault()
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'i' || e.key === 'j')) { e.preventDefault(); logEvent('devtools', 'DevTools shortcut', 'high') }
+  })
+
+  // Periodic heartbeat — detect if network goes suspiciously quiet
+  setInterval(() => logEvent('heartbeat', 'Session heartbeat', 'low'), 60000)
+
+  // Detect proctoring tab being closed mid-quiz (sendBeacon works during unload)
+  window.addEventListener('pagehide', () => {
+    if (!started || sessionEnding) return
+    navigator.sendBeacon(`${HOST}/api/event`, new Blob([JSON.stringify({
+      sessionId: SESSION_ID,
+      courseId: COURSE_ID,
+      studentId: STUDENT_ID,
+      eventType: 'tab_closed',
+      detail: 'Proctoring tab was closed or navigated away during session',
+      severity: 'high'
+    })], { type: 'application/json' }))
+  })
+}
+
+// ── End session ───────────────────────────────────────────────────────────────
+async function endSession() {
+  if (!confirm('End proctoring session? Make sure you have submitted your quiz first.')) return
+  sessionEnding = true
+  clearInterval(captureTimer); clearInterval(countdownTimer); clearInterval(faceDetectionTimer)
+  if (audioContext) audioContext.close()
+  await takeCapture('Final capture', false, 'final')
+  try {
+    await fetch(`${HOST}/api/end-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, courseId: COURSE_ID, studentId: STUDENT_ID, quizUrl: QUIZ_URL })
+    })
+    if (stream) stream.getTracks().forEach(t => t.stop())
+    if (document.fullscreenElement) document.exitFullscreen()
+    document.body.innerHTML = `
+      <div style="font-family:system-ui;background:#080c18;color:#e8eaf6;min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;text-align:center;padding:20px;">
+        <div style="font-size:48px;">✅</div>
+        <h2>Proctoring Session Complete</h2>
+        <p style="color:#6b7fa3;font-size:14px;max-width:400px;line-height:1.6;">
+          Your session has been recorded.<br>
+          Session ID: <strong style="color:#4a9eff">${SESSION_ID.slice(0,8)}...</strong><br>
+          Flags: <strong style="color:${flagCount > 0 ? '#f87171' : '#34d399'}">${flagCount}</strong>
+        </p>
+      </div>
+    `
+  } catch (e) {}
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function updateStats() {
+  document.getElementById('cap-count').textContent = capCount
+  document.getElementById('flag-count').textContent = flagCount
+  document.getElementById('event-count').textContent = eventCount
+  const pill = document.getElementById('flag-pill')
+  pill.textContent = `${flagCount} Flag${flagCount !== 1 ? 's' : ''}`
+  pill.className = `pill ${flagCount === 0 ? 'pill-ok' : flagCount < FLAG_THRESHOLD ? 'pill-warn' : 'pill-high'}`
+}
+
+function setPill(id, text, cls) {
+  const el = document.getElementById(id)
+  if (el) { el.textContent = text; el.className = `pill ${cls}` }
+}
+
+function addLog(msg, type) {
+  const list = document.getElementById('log-list')
+  const item = document.createElement('div')
+  item.className = 'log-item'
+  item.innerHTML = `<span class="log-msg log-${type}">${msg}</span><span class="log-time">${new Date().toLocaleTimeString()}</span>`
+  list.insertBefore(item, list.firstChild)
+  if (list.children.length > 50) list.removeChild(list.lastChild)
+}
+
+let alertTimeout = null
+function showAlert(msg, duration) {
+  const el = document.getElementById('alert')
+  el.textContent = msg; el.style.display = 'block'
+  if (alertTimeout) clearTimeout(alertTimeout)
+  alertTimeout = setTimeout(() => { el.style.display = 'none' }, duration || 5000)
+}
+
+function updateFaceStatus(text, color) {
+  const el = document.getElementById('face-status')
+  if (el) {
+    el.textContent = text
+    el.style.color = color === 'green' ? 'var(--green)' : color === 'red' ? 'var(--red)' : 'var(--muted)'
+  }
+}
+
+initWebcam()
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Session Review</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#080c18;--card:#111e35;--border:#1a2840;--text:#dde4f0;--muted:#6b7fa3;--blue:#4a9eff;--green:#34d399;--yellow:#fbbf24;--red:#f87171;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px 24px;}
+  a.back{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--blue);text-decoration:none;margin-bottom:20px;}
+  .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+  .header h1{font-size:18px;font-weight:600;}
+  .meta{font-size:12px;color:var(--muted);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;}
+  .actions{display:flex;gap:8px;}
+  .btn{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;}
+  .btn-clear{background:rgba(52,211,153,0.15);color:var(--green);border:1px solid rgba(52,211,153,0.3);}
+  .btn-flag{background:rgba(248,113,113,0.15);color:var(--red);border:1px solid rgba(248,113,113,0.3);}
+  .summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+  .s-item{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;}
+  .s-item .n{font-family:'DM Mono',monospace;font-size:20px;font-weight:500;}
+  .s-item .l{font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:2px;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .sec{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;}
+  .sec-title{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:600;margin-bottom:12px;}
+  .cap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;}
+  .cap-item{border-radius:6px;overflow:hidden;border:1px solid var(--border);}
+  .cap-item.flagged{border-color:var(--red);}
+  .cap-item img{width:100%;height:75px;object-fit:cover;display:block;background:#000;}
+  .cap-item .cm{padding:4px 6px;font-size:9px;color:var(--muted);}
+  .cap-item .cf{color:var(--red);font-weight:600;}
+  .ev-list{list-style:none;}
+  .ev{display:flex;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:11px;}
+  .ev:last-child{border-bottom:none;}
+  .ev-type{font-weight:600;min-width:110px;}
+  .ev-det{color:var(--muted);flex:1;}
+  .ev-time{color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;}
+  .sh{color:var(--red);}
+  .sl{color:var(--green);}
+  .badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;}
+  .b-pending{background:rgba(251,191,36,0.12);color:var(--yellow);border:1px solid rgba(251,191,36,0.25);}
+  .b-cleared{background:rgba(52,211,153,0.1);color:var(--green);border:1px solid rgba(52,211,153,0.2);}
+  .b-suspicious{background:rgba(248,113,113,0.12);color:var(--red);border:1px solid rgba(248,113,113,0.25);}
+</style>
+</head>
+<body>
+
+<a class="back" href="javascript:history.back()">← Back</a>
+
+<div class="header">
+  <div>
+    <h1>Session Review — <%= session.student_name %></h1>
+    <div class="meta">
+      <span>📋 <%= session.quiz_name %></span>
+      <span>🕐 <%= new Date(session.started_at).toLocaleString() %></span>
+      <span>Status: <span class="badge b-<%= session.review_status %>"><%= session.review_status %></span></span>
+      <span>Flags: <strong style="color:<%= session.flag_count>2?'var(--red)':session.flag_count>0?'var(--yellow)':'var(--green)' %>"><%= session.flag_count %></strong></span>
+    </div>
+  </div>
+  <div class="actions">
+    <form method="POST" action="/session/<%= session.id %>/review" style="display:inline">
+      <input type="hidden" name="status" value="cleared">
+      <input type="hidden" name="courseId" value="<%= session.course_id %>">
+      <button type="submit" class="btn btn-clear">✓ Clear</button>
+    </form>
+    <form method="POST" action="/session/<%= session.id %>/review" style="display:inline">
+      <input type="hidden" name="status" value="suspicious">
+      <input type="hidden" name="courseId" value="<%= session.course_id %>">
+      <button type="submit" class="btn btn-flag">⚠ Suspicious</button>
+    </form>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="s-item"><div class="n" style="color:var(--purple)"><%= captures.length %></div><div class="l">Captures</div></div>
+  <div class="s-item"><div class="n" style="color:var(--red)"><%= captures.filter(c=>c.is_flagged).length %></div><div class="l">Flagged</div></div>
+  <div class="s-item"><div class="n" style="color:var(--yellow)"><%= events.length %></div><div class="l">Events</div></div>
+  <div class="s-item"><div class="n" style="color:var(--red)"><%= events.filter(e=>e.severity==='high').length %></div><div class="l">High Severity</div></div>
+</div>
+
+<div class="two">
+  <div class="sec">
+    <div class="sec-title">Webcam Captures (<%= captures.length %>)</div>
+    <% if (!captures.length) { %><p style="color:var(--muted);font-size:13px;">No captures.</p>
+    <% } else { %>
+    <div class="cap-grid">
+      <% captures.forEach(c => { %>
+      <div class="cap-item <%= c.is_flagged?'flagged':'' %>">
+        <img src="/captures/<%= c.filename %>" onerror="this.parentElement.style.display='none'">
+        <div class="cm">
+          <%= new Date(c.captured_at).toLocaleTimeString() %>
+          <% if (c.is_flagged) { %><div class="cf">⚠ <%= c.flag_reason %></div><% } %>
+          <% if (c.capture_type && c.capture_type !== 'scheduled') { %><div style="font-size:10px;color:#a78bfa;margin-top:2px;text-transform:capitalize;"><%= c.capture_type.replace(/_/g,' ') %></div><% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Events (<%= events.length %>)</div>
+    <% if (!events.length) { %><p style="color:var(--muted);font-size:13px;">No events.</p>
+    <% } else { %>
+    <ul class="ev-list">
+      <% events.forEach(e => { %>
+      <li class="ev">
+        <span class="ev-type <%= e.severity==='high'?'sh':'sl' %>"><%= e.severity==='high'?'🔴':'🟢' %> <%= e.event_type.replace(/_/g,' ') %></span>
+        <span class="ev-det"><%= e.detail %></span>
+        <span class="ev-time"><%= new Date(e.occurred_at).toLocaleTimeString() %></span>
+      </li>
+      <% }) %>
+    </ul>
+    <% } %>
+  </div>
+</div>
+
+</body>
+</html>
