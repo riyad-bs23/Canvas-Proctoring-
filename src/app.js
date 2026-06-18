@@ -408,6 +408,36 @@ setInterval(() => {
   try { db.cleanupExpiredInstructorTokens() } catch (e) {}
 }, 6 * 60 * 60 * 1000)
 
+// ── LTI Config XML (for EduAppCenter) ────────────────────────────────────────
+app.get('/config.xml', (req, res) => {
+  res.set('Content-Type', 'application/xml')
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<cartridge_basiclti_link xmlns="http://www.imsglobal.org/xsd/imslticc_v1p0"
+  xmlns:blti="http://www.imsglobal.org/xsd/imsbasiclti_v1p0"
+  xmlns:lticm="http://www.imsglobal.org/xsd/imslticm_v1p0"
+  xmlns:lticp="http://www.imsglobal.org/xsd/imslticp_v1p0">
+  <blti:title>Canvas Proctoring</blti:title>
+  <blti:description>Webcam-based proctoring plugin for Canvas LMS. Monitors students during quizzes using face detection, audio monitoring, and tab-switch detection.</blti:description>
+  <blti:launch_url>${HOST}/launch</blti:launch_url>
+  <blti:extensions platform="canvas.instructure.com">
+    <lticm:property name="tool_id">canvas_proctoring</lticm:property>
+    <lticm:property name="privacy_level">public</lticm:property>
+    <lticm:options name="course_navigation">
+      <lticm:property name="url">${HOST}/launch</lticm:property>
+      <lticm:property name="text">Proctoring</lticm:property>
+      <lticm:property name="visibility">admins</lticm:property>
+      <lticm:property name="default">disabled</lticm:property>
+      <lticm:property name="enabled">true</lticm:property>
+    </lticm:options>
+  </blti:extensions>
+  <blti:vendor>
+    <lticp:code>canvas-proctoring</lticp:code>
+    <lticp:name>Canvas Proctoring</lticp:name>
+    <lticp:url>${HOST}</lticp:url>
+  </blti:vendor>
+</cartridge_basiclti_link>`)
+})
+
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.send(`
