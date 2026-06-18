@@ -16,7 +16,9 @@ const FLAG_THRESHOLD = parseInt(process.env.FLAG_THRESHOLD) || 3
 const CANVAS_URL = (process.env.CANVAS_URL || 'http://localhost:3000').replace(/\/$/, '')
 const CANVAS_TOKEN = process.env.CANVAS_API_TOKEN || ''
 
-const capturesDir = path.join(__dirname, '..', 'captures')
+const capturesDir = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'captures')
+  : path.join(__dirname, '..', 'captures')
 if (!fs.existsSync(capturesDir)) fs.mkdirSync(capturesDir, { recursive: true })
 
 app.use(bodyParser.urlencoded({ extended: true }))
