@@ -537,14 +537,32 @@ function setupEvents() {
 
   document.addEventListener('copy', e => {
     e.preventDefault()
-    logEvent('copy_attempt', 'Copy attempted', 'low')
-    addLog('Copy blocked', 'warn')
+    flagCount++; updateStats()
+    logEvent('copy_attempt', 'Copy attempted (Ctrl+C or selection copy)', 'medium')
+    addLog('⚠️ Copy blocked', 'warn')
+  })
+
+  document.addEventListener('cut', e => {
+    e.preventDefault()
+    flagCount++; updateStats()
+    logEvent('cut_attempt', 'Cut attempted (Ctrl+X or selection cut)', 'medium')
+    addLog('⚠️ Cut blocked', 'warn')
+  })
+
+  document.addEventListener('paste', e => {
+    e.preventDefault()
+    flagCount++; updateStats()
+    logEvent('paste_attempt', 'Paste attempted (Ctrl+V or right-click paste)', 'high')
+    addLog('🚫 Paste blocked — flagged', 'high')
+    takeCapture('Paste attempt detected', true, 'violation')
   })
 
   document.addEventListener('keydown', e => {
     if (e.key === 'F12') { e.preventDefault(); logEvent('devtools', 'F12 pressed', 'high'); addLog('⚠️ DevTools attempt', 'high') }
     if (e.altKey && e.key === 'Tab') { e.preventDefault(); logEvent('alt_tab', 'Alt+Tab', 'high'); addLog('⚠️ Alt+Tab', 'high') }
     if ((e.ctrlKey || e.metaKey) && e.key === 'c') e.preventDefault()
+    if ((e.ctrlKey || e.metaKey) && e.key === 'x') e.preventDefault()
+    if ((e.ctrlKey || e.metaKey) && e.key === 'v') e.preventDefault()
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'i' || e.key === 'j')) { e.preventDefault(); logEvent('devtools', 'DevTools shortcut', 'high') }
   })
 

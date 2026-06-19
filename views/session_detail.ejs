@@ -36,6 +36,7 @@
   .ev-det{color:var(--muted);flex:1;}
   .ev-time{color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;white-space:nowrap;}
   .sh{color:var(--red);}
+  .sm{color:var(--yellow);}
   .sl{color:var(--green);}
   .badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;}
   .b-pending{background:rgba(251,191,36,0.12);color:var(--yellow);border:1px solid rgba(251,191,36,0.25);}
@@ -105,7 +106,7 @@
     <ul class="ev-list">
       <% events.forEach(e => { %>
       <li class="ev">
-        <span class="ev-type <%= e.severity==='high'?'sh':'sl' %>"><%= e.severity==='high'?'🔴':'🟢' %> <%= e.event_type.replace(/_/g,' ') %></span>
+        <span class="ev-type <%= e.severity==='high'?'sh':e.severity==='medium'?'sm':'sl' %>"><%= e.severity==='high'?'🔴':e.severity==='medium'?'🟡':'🟢' %> <%= e.event_type.replace(/_/g,' ') %></span>
         <span class="ev-det"><%= e.detail %></span>
         <span class="ev-time local-time" data-utc="<%= e.occurred_at %>" data-format="time"><%= e.occurred_at %></span>
       </li>
