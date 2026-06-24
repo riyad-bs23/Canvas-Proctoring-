@@ -26,6 +26,18 @@ app.use(bodyParser.json({ limit: '5mb' }))
 app.set('view engine', 'ejs')
 app.set('views', path.join(__dirname, '..', 'views'))
 
+// ── CORS for Canvas custom JS (localhost only) ────────────────────────────────
+app.use((req, res, next) => {
+  const origin = req.headers.origin || ''
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
+
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -264,6 +276,26 @@ app.post('/api/capture', captureRateLimit, (req, res) => {
     })
   } catch (err) {
     console.error('Capture error:', err)
+    res.json({ success: false })
+  }
+})
+
+// ── API: Quiz page event (from Canvas custom JS) ──────────────────────────────
+app.post('/api/quiz-event', (req, res) => {
+  try {
+    const { canvasUserId, courseId, eventType, detail, severity } = req.body
+    if (!canvasUserId || !courseId) return res.json({ success: false })
+
+    const session = db.getActiveSessionByCanvasUserId(String(canvasUserId), String(courseId))
+    if (!session) return res.json({ success: false, reason: 'no_active_session' })
+
+    db.logEvent(session.id, session.course_id, session.student_id,
+      sanitize(eventType, 50), sanitize(detail, 500), severity || 'high')
+
+    const updated = db.getSession(session.id)
+    res.json({ success: true, flagCount: updated?.flag_count || 0 })
+  } catch (err) {
+    console.error('Quiz event error:', err)
     res.json({ success: false })
   }
 })

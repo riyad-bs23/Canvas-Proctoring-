@@ -104,6 +104,13 @@ function getActiveSession(studentId, courseId) {
   `).get(studentId, courseId)
 }
 
+function getActiveSessionByCanvasUserId(canvasUserId, courseId) {
+  return db.prepare(`
+    SELECT * FROM sessions
+    WHERE (canvas_user_id=? OR student_id=?) AND course_id=? AND status='active'
+  `).get(canvasUserId, canvasUserId, courseId)
+}
+
 function markIdVerified(sessionId) {
   db.prepare(`UPDATE sessions SET id_verified=1 WHERE id=?`).run(sessionId)
 }
@@ -217,7 +224,7 @@ function cleanupExpiredInstructorTokens() {
 
 module.exports = {
   createSession, getSession, endSession, getAllSessions, updateReview,
-  getActiveSession, markIdVerified, expireOldSessions,
+  getActiveSession, getActiveSessionByCanvasUserId, markIdVerified, expireOldSessions,
   saveCapture, getCaptures, getFlaggedCaptures,
   logEvent, getEvents, getRecentEvents,
   getCourseStats,
