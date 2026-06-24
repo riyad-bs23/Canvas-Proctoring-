@@ -440,6 +440,36 @@ setInterval(() => {
   try { db.cleanupExpiredInstructorTokens() } catch (e) {}
 }, 6 * 60 * 60 * 1000)
 
+// ── Canvas Custom JS (paste detection for quiz pages) ────────────────────────
+app.get('/canvas-custom.js', (req, res) => {
+  res.set('Content-Type', 'application/javascript')
+  res.set('Access-Control-Allow-Origin', '*')
+  res.send(`
+(function () {
+  if (!window.location.pathname.includes('/quizzes/') || !window.location.pathname.includes('/take')) return
+  var PROCTOR_URL = '${HOST}'
+  var courseIdMatch = window.location.pathname.match(/\\/courses\\/(\\d+)\\//)
+  var courseId = courseIdMatch ? courseIdMatch[1] : null
+  var canvasUserId = window.ENV && window.ENV.current_user ? String(window.ENV.current_user.id) : null
+  if (!courseId || !canvasUserId) return
+  function sendEvent(type, detail) {
+    fetch(PROCTOR_URL + '/api/quiz-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ canvasUserId: canvasUserId, courseId: courseId, eventType: type, detail: detail, severity: 'high' })
+    }).catch(function(){})
+  }
+  document.addEventListener('paste', function(e) {
+    var txt = ''
+    try { txt = e.clipboardData ? e.clipboardData.getData('text') : '' } catch(_) {}
+    sendEvent('paste_in_quiz', 'Pasted in quiz (' + txt.length + ' chars): ' + txt.slice(0, 100))
+  })
+  document.addEventListener('copy', function() { sendEvent('copy_in_quiz', 'Copied text from quiz') })
+  document.addEventListener('cut', function() { sendEvent('cut_in_quiz', 'Cut text from quiz') })
+})()
+  `)
+})
+
 // ── LTI Config XML (for EduAppCenter) ────────────────────────────────────────
 app.get('/config.xml', (req, res) => {
   res.set('Content-Type', 'application/xml')
